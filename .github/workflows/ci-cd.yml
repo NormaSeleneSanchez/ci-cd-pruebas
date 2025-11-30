@@ -1,15 +1,15 @@
-name: CI/CD simple con Pytest y GitHub Pages
-
+name: CI/CD con Página de Error
 on:
   push:
     branches: ["main"]
 
 jobs:
-  build:
+  test_and_build:
     runs-on: ubuntu-latest
-
+    outputs:
+      outcome: ${{ steps.test_step.outcome }}
     steps:
-      - name: Checkout del repositorio
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Configurar Python
@@ -21,20 +21,27 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Ejecutar pruebas
+        id: test_step
+        continue-on-error: true  # Importante: No detiene el workflow si falla
         run: pytest
 
-      - name: Generar HTML para despliegue
+      - name: Crear página según resultado
         run: |
-          echo "<h1>Despliegue exitoso</h1>" > index.html
-          echo "<p>Las pruebas pasaron correctamente.</p>" >> index.html
+          if [ "${{ steps.test_step.outcome }}" == "success" ]; then
+            echo "<h1>Despliegue exitoso</h1>" > index.html
+            echo "<p>Las pruebas pasaron correctamente.</p>" >> index.html
+          else
+            echo "<h1 style='color:red;'>Error en CI</h1>" > index.html
+            echo "<p>Favor de revisar las pruebas en GitHub Actions.</p>" >> index.html
+          fi
 
-      - name: Subir a GitHub Pages
+      - name: Subir artefacto
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
 
   deploy:
-    needs: build
+    needs: test_and_build
     runs-on: ubuntu-latest
     permissions:
       pages: write
